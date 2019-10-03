@@ -3,14 +3,32 @@ import matplotlib.pyplot as plt
 
 
 def PointEstimate(invK, x, Height):
+    '''
+    Inputs:
+        invK - 3x3 - inverse of Camera intrinsic matrix
+        x - 3xN - 2D homodeneous points
+        Height - 1x1 camera height
 
+    Output:
+        3xN - 3D world points    
+    '''
+
+    # diectional vector
     dirVector = invK @ x
     # print(dirVector)
 
+    # returns 3D world points 
     return (-Height * dirVector) / (np.array([[0,-1,0]]) @ dirVector) 
 
 def ScaleEstimate(X1, X2, R, T):
+    '''
+    X1 - 3 x N - 3D world points corresponding to image 1
+    X2 - 3 x N - 3D world points corresponding to image 2
+    R - 3 x 3 - Rotation of ego car pose 2 with respect to pose 1
+    T - 3 x 1 - Translation of ego car pose 2 with respect to pose 1
 
+    '''
+    # Minimizing square distance and choosing scale factor 
     scale = ((X1 - R @ X2).T @ T) / (T.T @ T)
         
     return scale
@@ -44,6 +62,7 @@ if __name__ == "__main__":
     print(Pixels_1.shape)
 
     Trans = np.array([[]])
+    # THRESHOLD
     Threshold = 20
     actual = np.array([-0.063183,-0.83695,46.425])
 
@@ -79,7 +98,8 @@ if __name__ == "__main__":
         # print(sc)
         # print(sc[0,int(len(scale) / 2)])
         # print(np.median(scale))
-        
+
+        #average scaling factor        
         avgscale = np.mean(scale)
         if i == 0:
            Trans = avgscale * T.T
@@ -98,5 +118,7 @@ if __name__ == "__main__":
     Trans = Trans + actual
     print(Trans)
     plt.plot(Trans[:,0],Trans[:,2],label = 'scaled')
+    plt.xlabel('x')
+    plt.ylabel('z')
     plt.legend()
     plt.show()    
