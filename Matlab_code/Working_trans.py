@@ -35,25 +35,30 @@ def ScaleEstimate(X1, X2, R, T):
 
 
 
+def Scale_trajectory(K, HeightOfCam, Corresponding_points_file, ORBSLAM_file, Ground_truth, Start_frame, End_frame, threshold):
 
-if __name__ == "__main__":
-    K  = np.array([
-    [7.215377e+02, 0.000000e+00, 6.095593e+02],
-    [0.000000e+00, 7.215377e+02, 1.728540e+02],
-    [0.000000e+00, 0.000000e+00, 1.000000e+00]
-    ])
+
+    '''
+    K - 3x3 - intrinsic matrix
+    HeighOfCam - 1x1 height of camera
+    Corresponding_points_file - npy file with corresponding points
+    ORBSLAM_file - ORBSLAM file 
+    Ground_truth - Ground_truth.txt file
+    Start_frame - initial frame
+    End_frame - Ending frame
+    threshold - depth threshold of points
+
+    This function plots scaled trajectory of the ORB SLam output vs ground truth.
+    '''
     invK = np.linalg.inv(K)
 
-    Height = 1.65
-    DataPixels = np.load('000001_tracks.npy')
-    DataPose = np.loadtxt('KITTITrajectoryComplete_new_3.txt')
-    actualdata = np.loadtxt('3.txt',delimiter=',')
+
+    DataPixels = np.load(Corresponding_points_file)
+    DataPose = np.loadtxt(ORBSLAM_file)
+    actualdata = np.loadtxt(Ground_truth,delimiter=',')
     print(actualdata.shape)
-    plt.plot(actualdata[41:50,9],actualdata[41:50,11],'r',label='Ground truth')
-
-    print(DataPose.shape)
-
-    DataPose = DataPose[41:50,:]
+    
+    DataPose = DataPose[Start_frame:End_frame,:]
 
     Pixels_1 = DataPixels[0,:,:]
     Pixels_2 = DataPixels[1,:,:]
@@ -63,10 +68,13 @@ if __name__ == "__main__":
 
     Trans = np.array([[]])
     # THRESHOLD
-    Threshold = 20
-    actual = np.array([-0.063183,-0.83695,46.425])
-
-    for i in range(8):
+    Threshold = threshold
+    # actual = np.array([-0.063183,-0.83695,46.425])
+    Ccumu = np.eye(4)
+    Ca_cummu = np.eye(4) 
+    Trans = np.array([0, 0, 0])
+    TransActual = np.array([0, 0, 0])
+    for i in range(End_frame - Start_frame - 1):
         
         Pose1 = DataPose[i,:]
         Pose2 = DataPose[i + 1,:]
@@ -78,47 +86,74 @@ if __name__ == "__main__":
         # print(X2.shape)
 
         X2 = X2[:,tempArray]
-        print(X2.shape)
-
         R1 = np.mat([[Pose1[1],Pose1[2],Pose1[3]],[Pose1[4],Pose1[5],Pose1[6]],[Pose1[7],Pose1[8],Pose1[9]]]) 
         T1 = np.mat([[Pose1[10]],[Pose1[11]],[Pose1[12]]])
+        C1 = np.vstack((np.hstack((R1, T1)),np.array([0, 0, 0, 1])))
+        
 
         R2 = np.mat([[Pose2[1],Pose2[2],Pose2[3]],[Pose2[4],Pose2[5],Pose2[6]],[Pose2[7],Pose2[8],Pose2[9]]]) 
         T2 = np.mat([[Pose2[10]],[Pose2[11]],[Pose2[12]]])
 
-        R = R1.T @ R2
-        T = T2 - T1
+        C2 = np.vstack((np.hstack((R2, T2)),np.array([0, 0, 0, 1])))
+        invC = np.vstack((np.hstack((R1.T, -R1.T @ T1)),np.array([0, 0, 0, 1])))
+        C_change = invC @ C2
+        R = C_change[:3,:3]
+        T = C_change[:3,3]
+
         T = T / np.linalg.norm(T)
 
         scale = ScaleEstimate(X1, X2, R, T)
-        # print(scale.shape)
-        # print(scale)
-        
-        # sc = np.median(scale)
-        # print(sc)
-        # print(sc[0,int(len(scale) / 2)])
-        # print(np.median(scale))
 
+        Ractual = actualdata[Start_frame + i, :9]
+        Ractual = np.reshape(Ractual,(3,3))
+        Tactual = np.array([actualdata[Start_frame + i, 9:]]).T
+
+        Ractual2 = actualdata[Start_frame + i - 1, :9]
+        Ractual2 = np.reshape(Ractual,(3,3))
+        Tactual2 = np.array([actualdata[Start_frame + i - 1, 9:]]).T    
+        actualPose_1 = np.vstack((np.hstack((Ractual2, Tactual2)),np.array([0, 0, 0, 1])))
+        actualPose = np.vstack((np.hstack((Ractual, Tactual)),np.array([0, 0, 0, 1])))
+        invCa_1 = np.vstack((np.hstack((Ractual2.T, -Ractual2.T @ Tactual2)),np.array([0, 0, 0, 1])))
+
+        Ca_ = invCa_1 @ actualPose
+        Ca_cummu = Ca_cummu @ Ca_
         #average scaling factor        
         avgscale = np.mean(scale)
-        if i == 0:
-           Trans = avgscale * T.T
-        else:
-           Trans = np.vstack((Trans,avgscale * T.T))
+        
+        # print(avgscale * T)
+        Tcorr = avgscale * T
+        C = np.vstack((np.hstack((R, Tcorr)),np.array([0, 0, 0, 1])))
+        Ccumu = Ccumu @ C
+        
+        Trans = np.vstack((Trans,Ccumu[:3,3].T))
+        TransActual = np.vstack((TransActual,Ca_cummu[:3,3].T))
+        
 
-        print(avgscale * T.T)
-        # print(R.shape)
-        # print(T.shape)
-
-
-    for i in range(1,Trans.shape[0]):
-
-        Trans[i] = Trans[i] + Trans[i - 1]
-
-    Trans = Trans + actual
     print(Trans)
+    print(TransActual)
     plt.plot(Trans[:,0],Trans[:,2],label = 'scaled')
+    plt.plot(TransActual[:,0],TransActual[:,2],label = 'Ground Truth')
+
     plt.xlabel('x')
     plt.ylabel('z')
     plt.legend()
     plt.show()    
+
+
+if __name__ == "__main__":
+    K  = np.array([
+    [7.215377e+02, 0.000000e+00, 6.095593e+02],
+    [0.000000e+00, 7.215377e+02, 1.728540e+02],
+    [0.000000e+00, 0.000000e+00, 1.000000e+00]
+    ])
+    invK = np.linalg.inv(K)
+
+    Height = 1.65
+    points_file = '000001_tracks.npy'
+    ORBSLAM_file = 'KITTITrajectoryComplete_new_3.txt'
+    Ground_truth_file = '3.txt'
+    Start_frame = 41
+    End_frame = 59
+    Threshold = 15
+    Scale_trajectory(K, Height,points_file, ORBSLAM_file, Ground_truth_file, Start_frame, End_frame, Threshold)
+    
