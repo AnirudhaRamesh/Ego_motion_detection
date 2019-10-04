@@ -52,8 +52,9 @@ def Scale_trajectory(K, HeightOfCam, Corresponding_points_file, ORBSLAM_file, Gr
     '''
     invK = np.linalg.inv(K)
 
-
+    f = open('3_scales.txt','wb')
     DataPixels = np.load(Corresponding_points_file)
+    print(DataPixels.shape)
     DataPose = np.loadtxt(ORBSLAM_file)
     actualdata = np.loadtxt(Ground_truth,delimiter=',')
     print(actualdata.shape)
@@ -103,6 +104,9 @@ def Scale_trajectory(K, HeightOfCam, Corresponding_points_file, ORBSLAM_file, Gr
         T = T / np.linalg.norm(T)
 
         scale = ScaleEstimate(X1, X2, R, T)
+        print(scale.shape)
+        np.savetxt(f, scale.T, delimiter=', ', newline='')
+        # f.write('\n')
 
         Ractual = actualdata[Start_frame + i, :9]
         Ractual = np.reshape(Ractual,(3,3))
@@ -131,14 +135,14 @@ def Scale_trajectory(K, HeightOfCam, Corresponding_points_file, ORBSLAM_file, Gr
 
     print(Trans)
     print(TransActual)
-    plt.plot(Trans[:,0],Trans[:,2],label = 'scaled')
-    plt.plot(TransActual[:,0],TransActual[:,2],label = 'Ground Truth')
+    plt.plot(Trans[:,0],Trans[:,2],'b-o',label = 'scaled')
+    plt.plot(TransActual[:,0],TransActual[:,2],'r-o',label = 'Ground Truth')
 
     plt.xlabel('x')
     plt.ylabel('z')
     plt.legend()
     plt.show()    
-
+    f.close()
 
 if __name__ == "__main__":
     K  = np.array([
@@ -152,8 +156,8 @@ if __name__ == "__main__":
     points_file = '000001_tracks.npy'
     ORBSLAM_file = 'KITTITrajectoryComplete_new_3.txt'
     Ground_truth_file = '3.txt'
-    Start_frame = 41
-    End_frame = 59
+    Start_frame = 5
+    End_frame = 114
     Threshold = 15
     Scale_trajectory(K, Height,points_file, ORBSLAM_file, Ground_truth_file, Start_frame, End_frame, Threshold)
     
