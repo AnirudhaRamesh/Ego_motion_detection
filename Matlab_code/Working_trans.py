@@ -33,8 +33,6 @@ def ScaleEstimate(X1, X2, R, T):
         
     return scale
 
-
-
 def Scale_trajectory(K, HeightOfCam, Corresponding_points_file, ORBSLAM_file, Ground_truth, Start_frame, End_frame, threshold):
 
 
